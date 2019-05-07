@@ -116,18 +116,60 @@ class QuestionAnswerModule:
 		#sentences_set = set(sentences_set)
 		return sentences_set
 
-	def check_ques_type(question,sentences_set):
+	def check_ques_type(self, question,sorted_overlapped):
+		#print('Entered', question,sorted_overlapped[0][0])
 		if any(word in question.lower() for word in ['who','whom']):
-			filtered = extract_sent_named_entity('who',sentences_set)
+			filtered = self.extract_sent_named_entity('who', sorted_overlapped)
 		elif 'when' in question.lower():
-			filtered = extract_sent_named_entity('when',sentences_set)
+			filtered = self.extract_sent_named_entity('when', sorted_overlapped)
 		else:
-			filtered = extract_sent_named_entity('where',sentences_set)
+			filtered = self.extract_sent_named_entity('where', sorted_overlapped)
 		return filtered
 
-	def extract_sent_named_entity(self, sentences_set):
-		if type == 'who':
-			print("")
+	def extract_sent_named_entity(self, question, sorted_overlapped):
+		#print('Entered entity function', question, sorted_overlapped[0][0])
+		flag = 0
+		ent_type = []
+		nlp = spacy.load("en_core_web_sm")
+		if question == 'who':
+			print("Entered who type\n")
+			for sent in sorted_overlapped:
+				#print(sent[0])
+				doc = nlp(sent[0])
+				for ent in doc.ents:
+					if (ent.label_ == "PERSON") or (ent.label_== "ORG"):   #Change here based on desired entity
+						ent_type.append(sent[0])
+						flag = 1
+					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
+					if (flag ==1):
+						break
+
+		elif question == 'where':
+			print("Entered where type\n")
+			for sent in sorted_overlapped:
+				#print(sent[0])
+				doc = nlp(sent[0])
+				for ent in doc.ents:
+					if (ent.label_ == "LOC") or (ent.label_== "FAC") or (ent.label_ == "GPE"):      #Change here based on desired entity
+						ent_type.append(sent[0])
+						flag = 1
+					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
+					if (flag ==1):
+						break
+					
+		else: #type == when
+			print("Entered when type\n")
+			for sent in sorted_overlapped:
+				#print(sent[0])
+				doc = nlp(sent[0])
+				for ent in doc.ents:
+					if (ent.label_ == "DATE") or (ent.label_== "TIME"):     #Change here based on desired entity
+						ent_type.append(sent[0])
+						flag = 1
+					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
+					if (flag ==1):
+						break
+		return ent_type
 
 	# find synonyms of the words in the list
 	def extract_syn(self, search_list):
@@ -240,8 +282,10 @@ def main():
 	#print(s)
 	overlap_sent = ob.overlap(top_indices, s)
 	sorted_overlapped = ob.Sort_Tuple(overlap_sent)[0:20]
-	print(sorted_overlapped)
-	
+	#print(sorted_overlapped[0][0])
+	entity_filtered = ob.check_ques_type(question,sorted_overlapped)
+	for i in entity_filtered:
+		print("Sentence-",i,"\n")
 	'''new_ques.append(s.lower())
 	#print (new_ques)
 	vector = ob.tf_idf(new_ques)

@@ -10,7 +10,7 @@ import numpy as np
 from nltk.corpus import wordnet
 from collections import defaultdict
 from nltk.tag import pos_tag
-question = "Who are you?"
+question = "When are you?"
 sentences_set = ["My name is Habil",
 				 "I had a chicken dinner", 
 				 "You are a good man,Theon", 
@@ -35,31 +35,31 @@ def extract_sent_named_entity(self, sentences_set):
 			print(sent)
 			doc = nlp(sent)
 			for ent in doc.ents:
-				if ent.label_ == "PERSON":
+				if (ent.label_ == "PERSON") or (ent.label_== "ORG"):   #Change here based on desired entity
 					ent_type.append(sent)
 					flag = 1
 				print(ent.text, ent.start_char, ent.end_char, ent.label_)
 				if (flag ==1):
 					break
 
-	elif self == 'when':
+	elif self == 'where':
 		for sent in sentences_set:
 			print(sent)
 			doc = nlp(sent)
 			for ent in doc.ents:
-				if ent.label_ == "PERSON":
+				if (ent.label_ == "LOC") or (ent.label_== "FAC") or (ent.label_ == "GPE"):      #Change here based on desired entity
 					ent_type.append(sent)
 					flag = 1
 				print(ent.text, ent.start_char, ent.end_char, ent.label_)
 				if (flag ==1):
 					break
 				
-	else: #type == where
+	else: #type == when
 		for sent in sentences_set:
 			print(sent)
 			doc = nlp(sent)
 			for ent in doc.ents:
-				if ent.label_ == "PERSON":
+				if (ent.label_ == "DATE") or (ent.label_== "TIME"):     #Change here based on desired entity
 					ent_type.append(sent)
 					flag = 1
 				print(ent.text, ent.start_char, ent.end_char, ent.label_)
