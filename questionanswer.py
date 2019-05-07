@@ -64,17 +64,22 @@ class QuestionAnswerModule:
 		search_list = []
 		doc = nlp(question)
 		root = ""
+		nsub = ""
 		for token in doc:
 			if token.text.lower() not in stopwords.words('english') and token.text.lower() not in ques_types:
 				
-				#print(token.text, token.pos_, token.dep_)
+				print(token.text, token.pos_, token.dep_)
 				if token.dep_ in ("ROOT","acl","advcl","amod","advmod","compound","csubj","nsubjpass",
-				 	"nn","attr","dobj","npmod","nsubj","pobj"):
-					#print(token.text, token.pos_, token.dep_)
+				 	"nn","attr","dobj","npmod","nsubj","pobj","acomp"):
+					print(token.text, token.pos_, token.dep_)
 					#if token.dep_ in ("ROOT") or token.pos_ in ("VERB"):
 					search_list.append([token.text.lower(),token.dep_,token.pos_])
 					if(token.dep_ == "ROOT"):
 						root = token.text
+					if(token.dep_ == "nsubj"):
+						nsub = token.text
+		if root == "":
+			root = nsub
 		return root,search_list
 
 	#extract sentences from the top 3 documents based on root and its synonyms
@@ -152,7 +157,7 @@ class QuestionAnswerModule:
 								syno[word].append(l.name())
 							        
 					#***********HYPONYMS********************
-					for i in range(0,len(wordnet.synsets(word))):
+					'''for i in range(0,len(wordnet.synsets(word))):
 						abc = wordnet.synset(wordnet.synsets(word)[i].name()).hyponyms()
 						for j in range(len(abc)):
 							hab.append(abc[j].lemma_names())
@@ -161,7 +166,7 @@ class QuestionAnswerModule:
 					#print(flat_list2)
 					for hypo in flat_list2: 
 						syno[word].append(hypo)
-					flat_list2.clear()
+					flat_list2.clear()'''
 		                
 					#***********HYPERNYMS********************  
 					'''for i in range(0,len(wordnet.synsets(word))): 
@@ -184,7 +189,7 @@ class QuestionAnswerModule:
 		for word in ques:
 			if word:
 				ques_v.append(word.lemma_)
-		print (ques_v)
+		#print(ques_v)
 		for t in top_indices:
 			file = self.filenames[t]
 			with open(file,'r',encoding='utf-8-sig') as fp:
@@ -220,7 +225,7 @@ def main():
 	corpora.append(ques)
 	vector = ob.tf_idf(corpora)						
 	cos_array = ob.cosine_sim(vector)
-	top_indices = ob.get_top_k(cos_array, 4)							# get indices of top 4 documents
+	top_indices = ob.get_top_k(cos_array, 2)							# get indices of top 4 documents
 	#print(top_indices)
 	root, ques_search_list = ob.dep_parse_ques(question,ques_types)		#parse question into word, dependency parse tag
 	#print (ques_search_list)
@@ -240,7 +245,36 @@ def main():
 	#print(s)
 	overlap_sent = ob.overlap(top_indices, s)
 	sorted_overlapped = ob.Sort_Tuple(overlap_sent)[0:20]
-	print(sorted_overlapped)
+	#print(sorted_overlapped)
+	root = nlp(root)
+	filtered_res = []
+	nounlist = []
+	quesnoun = []
+	for t in ques_search_list:
+		if t[2] == 'PROPN':
+			quesnoun.append(t[0])
+	print (quesnoun)
+	for sent in sorted_overlapped:
+		s = nlp(sent[0])
+		roots = []
+		ans = []
+		for ent in s.ents:
+			if ent.label_ in ('DATE','TIME'):
+				ans.append(ent.text)
+				for token in s:
+					if token.dep_ == 'ROOT':
+						roots.append(token.lemma_.lower())
+					if token.dep_ in ('nsubj','dobj','compound'):
+						nounlist.append(token.text.lower())
+				#if str(root[0]) in roots or str(root[0].lemma_) in roots:
+				for value in syn_list[str(root[0])]:
+					if value in roots or str(root[0].lemma_) in roots:
+						for v in quesnoun:
+							if v in nounlist:
+								filtered_res.append((sent[0],ans))
+								break
+	#filtered_res = set(filtered_res[0])
+	print (filtered_res[0:2])
 	
 	'''new_ques.append(s.lower())
 	#print (new_ques)
