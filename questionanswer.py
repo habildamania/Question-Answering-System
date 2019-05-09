@@ -142,7 +142,7 @@ class QuestionAnswerModule:
 				#print(sent[0])
 				doc = nlp(sent[0])
 				for ent in doc.ents:
-					if (ent.label_ == "PERSON") or (ent.label_== "ORG"):   #Change here based on desired entity
+					if ent.label_ in ('PERSON','ORG'):   #Change here based on desired entity
 						ent_type.append(sent[0])
 						flag = 1
 					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
@@ -155,7 +155,7 @@ class QuestionAnswerModule:
 				#print(sent[0])
 				doc = nlp(sent[0])
 				for ent in doc.ents:
-					if (ent.label_ == "LOC") or (ent.label_== "FAC") or (ent.label_ == "GPE"):      #Change here based on desired entity
+					if ent.label_ in ('LOC','FAC','GPE'):      #Change here based on desired entity
 						ent_type.append(sent[0])
 						flag = 1
 					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
@@ -168,7 +168,7 @@ class QuestionAnswerModule:
 				#print(sent[0])
 				doc = nlp(sent[0])
 				for ent in doc.ents:
-					if (ent.label_ == "DATE") or (ent.label_== "TIME"):     #Change here based on desired entity
+					if ent.label_ in ('DATE','TIME'):    #Change here based on desired entity
 						ent_type.append(sent[0])
 						flag = 1
 					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
