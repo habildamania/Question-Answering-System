@@ -31,7 +31,7 @@ class QuestionAnswerModule:
 			#file = open(fname,'r',encoding='utf-8-sig')
 			#for line in file:
 			#	content += line.rstrip('\n')
-			content = open(fname,'r',encoding='utf-8-sig').read()
+			content = open(fname,'r',encoding='latin-1').read()
 			#print (content)
 			corpora.append(content)
 		return corpora
@@ -70,11 +70,11 @@ class QuestionAnswerModule:
 		root = ""
 		nsub = ""
 		for token in doc:
-			if token.text.lower() not in stopwords.words('english') and token.text.lower() not in ques_types:
-				
-				#print(token.text, token.pos_, token.dep_)
+			#if token.text.lower() not in stopwords.words('english') and token.text.lower() not in ques_types:
+			if token.text.lower() not in ques_types:	
+				print(token.text, token.pos_, token.dep_)
 				if token.dep_ in ("ROOT","acl","advcl","amod","advmod","compound","csubj","nsubjpass",
-				 	"nn","attr","dobj","npmod","nsubj","pobj","acomp"):
+				 	"nn","attr","dobj","npmod","nsubj","pobj","acomp","pcomp"):
 					#print(token.text, token.pos_, token.dep_)
 					#if token.dep_ in ("ROOT") or token.pos_ in ("VERB"):
 					search_list.append([token.text.lower(),token.dep_,token.pos_])
@@ -97,7 +97,7 @@ class QuestionAnswerModule:
 		#print(ques_v)
 		for t in top_indices:
 			file = self.filenames[t]
-			with open(file,'r',encoding='utf-8-sig') as fp:
+			with open(file,'r',encoding='latin-1') as fp:
 				content = fp.read()
 				content = tokenize.sent_tokenize(content)
 				for line in content:
@@ -137,47 +137,52 @@ class QuestionAnswerModule:
 
 	def extract_sent_named_entity(self, question, sorted_overlapped):
 		#print('Entered entity function', question, sorted_overlapped[0][0])
-		flag = 0
 		ent_type = []
 		nlp = spacy.load("en_core_web_sm")
 		if question == 'who':
-			print("Entered who type\n")
+			#print("Entered who type\n")
 			for sent in sorted_overlapped:
 				#print(sent[0])
+				ans = []
+				flag = 0
 				doc = nlp(sent[0])
 				for ent in doc.ents:
 					if (ent.label_ == "PERSON") or (ent.label_== "ORG"):   #Change here based on desired entity
-						ent_type.append((sent[0],ent.text))
+						ans.append(ent.text)
 						flag = 1
 					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
-					if (flag ==1):
-						break
+				if (flag ==1):
+					ent_type.append((sent[0],set(ans)))
 
 		elif question == 'where':
 			print("Entered where type\n")
 			for sent in sorted_overlapped:
 				#print(sent[0])
+				ans = []
+				flag = 0
 				doc = nlp(sent[0])
 				for ent in doc.ents:
 					if (ent.label_ == "LOC") or (ent.label_== "FAC") or (ent.label_ == "GPE"):      #Change here based on desired entity
-						ent_type.append((sent[0],ent.text))
+						ans.append(ent.text)
 						flag = 1
 					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
-					if (flag ==1):
-						break
+				if (flag ==1):
+					ent_type.append((sent[0],set(ans)))
 					
 		else: #type == when
 			print("Entered when type\n")
 			for sent in sorted_overlapped:
 				#print(sent[0])
+				ans = []
+				flag = 0
 				doc = nlp(sent[0])
 				for ent in doc.ents:
 					if (ent.label_ == "DATE") or (ent.label_== "TIME"):     #Change here based on desired entity
-						ent_type.append((sent[0],ent.text))
+						ans.append(ent.text)
 						flag = 1
 					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
-					if (flag ==1):
-						break
+				if (flag ==1):
+					ent_type.append((sent[0],set(ans)))
 		return ent_type
 
 	# find synonyms of the words in the list
@@ -238,7 +243,7 @@ class QuestionAnswerModule:
 		#print(ques_v)
 		for t in top_indices:
 			file = self.filenames[t]
-			with open(file,'r',encoding='utf-8-sig') as fp:
+			with open(file,'r',encoding='latin-1') as fp:
 				content = fp.read()
 				content = tokenize.sent_tokenize(content)
 				for line in content:
@@ -288,15 +293,53 @@ class QuestionAnswerModule:
 	def getfilename(self,index):
 		return self.filenames[index[0]]
 
+	def dependency_parse(self,results,root,quesnoun,syn_list):
+		rootfiltered = []
+		#print (quesnoun)
+		for sent in results:
+			sentence = nlp(sent[0])
+			sentroots = []
+			nounlist = []
+			for token in sentence:
+				if token.dep_ == 'ROOT':
+					sentroots.append(token.lemma_.lower())
+			#if str(root[0]) in roots or str(root[0].lemma_) in roots:
+			for value in syn_list[str(root[0])]:
+				if value.lower() in sentroots or str(root[0].lemma_).lower() in sentroots:
+					#print("yes ",sentroots," yes ",sent[0])
+					rootfiltered.append(sent)
+					break
+		nounfiltered = []
+		for sent in rootfiltered:
+			sentence = nlp(sent[0])
+			nounlist = []
+			for token in sentence:
+				
+				if token.dep_ in ('nsubj','dobj','compound','nsubjpass'):
+					nounlist.append(token.text.lower())
+					#print(nounlist)
+			for noun in quesnoun:
+				if noun.lower() in nounlist:
+					#print("no",sent[0])
+					#print(nounlist," yes ",quesnoun,sent[0])
+					nounfiltered.append(sent)
+					break
+		#print(nounfiltered[0:2])
+		return nounfiltered
+			
+
+	
+
 def main():
 	#quesfile = input("Enter your filename : ")
-	#with open(quesfile,'r',encoding='utf-8-sig') as fp:
+	#with open(quesfile,'r',encoding='latin-1') as fp:
 	#question = fp.readline().rstrip()
 #	while question:
 	#print(question)
 	question = input("Enter question: ")
-	translator = str.maketrans('', '', string.punctuation)
-	question = question.translate(translator)
+	#translator = str.maketrans('', '', string.punctuation)
+	#question = question.translate(translator)
+	question.replace("?", "")
 	ques_types = ['who','whom','when','where']							#types of questions we are handling
 	ob = QuestionAnswerModule() 
 	doc = nlp(question)
@@ -332,40 +375,21 @@ def main():
 	overlap_sent = ob.overlap(top_indices, s)
 	sorted_overlapped = ob.Sort_Tuple(overlap_sent)[0:20]
 	filtered_res = ob.check_ques_type(question,sorted_overlapped)
-	print(filtered_res[0:2])
-	filename = ob.getfilename(top_indices)
+	#filename = ob.getfilename(top_indices)
 	#ob.generateJson(question,filtered_res[0:2],filename)
 	#question = fp.readline()
-	'''root = nlp(root)
-	filtered_res = []
-	nounlist = []
+	root = nlp(root)
+	#filtered_res = []
 	quesnoun = []
 	for t in ques_search_list:
 		if t[2] == 'PROPN':
 			quesnoun.append(t[0])
-	print (quesnoun)
-	for sent in sorted_overlapped:
-		s = nlp(sent[0])
-		roots = []
-		ans = []
-		for ent in s.ents:
-			if ent.label_ in ('DATE','TIME'):
-				ans.append(ent.text)
-				for token in s:
-					if token.dep_ == 'ROOT':
-						roots.append(token.lemma_.lower())
-					if token.dep_ in ('nsubj','dobj','compound'):
-						nounlist.append(token.text.lower())
-				#if str(root[0]) in roots or str(root[0].lemma_) in roots:
-				for value in syn_list[str(root[0])]:
-					if value in roots or str(root[0].lemma_) in roots:
-						for v in quesnoun:
-							if v in nounlist:
-								filtered_res.append((sent[0],ans))
-								break
-	#filtered_res = set(filtered_res[0])
-	print (filtered_res[0:2])'''
-	
+	#print (quesnoun)
+	print (filtered_res[0:5])
+	final_res = ob.dependency_parse(filtered_res,root,quesnoun,syn_list)
+	print (final_res)
+
+
 	'''new_ques.append(s.lower())
 	#print (new_ques)
 	vector = ob.tf_idf(new_ques)
