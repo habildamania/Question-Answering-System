@@ -31,7 +31,7 @@ class QuestionAnswerModule:
 			#file = open(fname,'r',encoding='utf-8-sig')
 			#for line in file:
 			#	content += line.rstrip('\n')
-			content = open(fname,'r',encoding='latin-1').read()
+			content = open(fname,'r',encoding='utf-8-sig').read()
 			#print (content)
 			corpora.append(content)
 		return corpora
@@ -69,12 +69,16 @@ class QuestionAnswerModule:
 		doc = nlp(question)
 		root = ""
 		nsub = ""
+		backroot = ""
+		verb = ""
 		for token in doc:
-			#if token.text.lower() not in stopwords.words('english') and token.text.lower() not in ques_types:
-			if token.text.lower() not in ques_types:	
-				print(token.text, token.pos_, token.dep_)
+			if token.dep_ == "ROOT":
+				backroot = token.text
+			if token.text.lower() not in stopwords.words('english') and token.text.lower() not in ques_types:
+			#if token.text.lower() not in ques_types:	
+				#print(token.text, token.pos_, token.dep_)
 				if token.dep_ in ("ROOT","acl","advcl","amod","advmod","compound","csubj","nsubjpass",
-				 	"nn","attr","dobj","npmod","nsubj","pobj","acomp","pcomp"):
+				 	"nn","attr","dobj","npmod","nsubj","pobj","acomp","pcomp","relcl"):
 					#print(token.text, token.pos_, token.dep_)
 					#if token.dep_ in ("ROOT") or token.pos_ in ("VERB"):
 					search_list.append([token.text.lower(),token.dep_,token.pos_])
@@ -82,12 +86,19 @@ class QuestionAnswerModule:
 						root = token.text
 					if(token.dep_ == "nsubj"):
 						nsub = token.text
-		if root == "":
+					if(token.pos_ == "VERB"):
+						verb = token.text
+		if root == "" and nsub != "":
 			root = nsub
+		elif root == "" and nsub == "" and verb!="":
+			root = verb
+		else:
+			root = backroot
+		#print("              ",root)
 		return root,search_list
 
 	#extract sentences from the top 3 documents based on root and its synonyms
-	def extract_sentences_root(self, ques, search_dict,top_indices):
+	'''def extract_sentences_root(self, ques, search_dict,top_indices):
 		sentences_set = []
 		ques_v = []
 		#print (ques)
@@ -97,7 +108,7 @@ class QuestionAnswerModule:
 		#print(ques_v)
 		for t in top_indices:
 			file = self.filenames[t]
-			with open(file,'r',encoding='latin-1') as fp:
+			with open(file,'r',encoding='utf-8-sig') as fp:
 				content = fp.read()
 				content = tokenize.sent_tokenize(content)
 				for line in content:
@@ -123,7 +134,7 @@ class QuestionAnswerModule:
 								sentences_set.append(line)
 					#sentences_set.append(line)
 		#sentences_set = set(sentences_set)
-		return sentences_set
+		return sentences_set'''
 
 	def check_ques_type(self, question,sorted_overlapped):
 		#print('Entered', question,sorted_overlapped[0][0])
@@ -155,14 +166,14 @@ class QuestionAnswerModule:
 					ent_type.append((sent[0],set(ans)))
 
 		elif question == 'where':
-			print("Entered where type\n")
+			#print("Entered where type\n")
 			for sent in sorted_overlapped:
 				#print(sent[0])
 				ans = []
 				flag = 0
 				doc = nlp(sent[0])
 				for ent in doc.ents:
-					if (ent.label_ == "LOC") or (ent.label_== "FAC") or (ent.label_ == "GPE"):      #Change here based on desired entity
+					if (ent.label_ == "LOC") or (ent.label_ == "GPE"):      #Change here based on desired entity
 						ans.append(ent.text)
 						flag = 1
 					#print(ent.text, ent.start_char, ent.end_char, ent.label_)
@@ -170,7 +181,7 @@ class QuestionAnswerModule:
 					ent_type.append((sent[0],set(ans)))
 					
 		else: #type == when
-			print("Entered when type\n")
+			#print("Entered when type\n")
 			for sent in sorted_overlapped:
 				#print(sent[0])
 				ans = []
@@ -220,7 +231,7 @@ class QuestionAnswerModule:
 					flat_list2.clear()'''
 		                
 					#***********HYPERNYMS********************  
-					'''for i in range(0,len(wordnet.synsets(word))): 
+					for i in range(0,len(wordnet.synsets(word))): 
 						xyz = wordnet.synset(wordnet.synsets(word)[i].name()).hypernyms() 
 						for h in range(len(xyz)): 
 							kan.append(xyz[h].lemma_names()) 
@@ -228,7 +239,7 @@ class QuestionAnswerModule:
 					kan.clear()
 					for hyper in flat_list1: 
 						syno[word].append(hyper) 
-					flat_list1.clear()'''
+					flat_list1.clear()
 		for key, value in syno.items():
 			syno[key] = set(value)
 		return syno
@@ -243,78 +254,91 @@ class QuestionAnswerModule:
 		#print(ques_v)
 		for t in top_indices:
 			file = self.filenames[t]
-			with open(file,'r',encoding='latin-1') as fp:
+			#print("#######################",file)
+			with open(file,'r',encoding='utf-8-sig') as fp:
 				content = fp.read()
 				content = tokenize.sent_tokenize(content)
 				for line in content:
+					if line.startswith('See also'):
+						break
 					newline = nlp(line)
 					line_v = []
 					for word in newline:
 						line_v.append(word.lemma_)
 					sentences_set.append((line,len(list(set(ques_v).intersection(set(line_v))))))
-		return sentences_set
+		return sentences_set,file
 
 	def Sort_Tuple(self,tup):  
 		tup.sort(key = lambda x: x[1],reverse = True)  
 		return tup
 
-	def generateJson(self,question,sentences,documents):
-		f= open("jsondata.txt","a+")
+	def generateJson(self,f,question,answer,sentences,documents):
 		jsonData = dict({})
 		jsonData["Question"] = question
 		jsonData["answers"] = dict({})
 		ansDict = dict()
-		for i in range(0,len(sentences)):
-			ansDict[str(i+1)] = sentences[i][1]
+		i = 0
+		ansDict[str(i+1)] = answer
 		jsonData["answers"] = ansDict
 
+		i = 0
 		jsonData["sentences"] = dict({})
 		sentDict = dict()
-		for i in range(0,len(sentences)):
-			sentDict[str(i+1)] = sentences[i][0]
+		sentDict[str(i+1)] = sentences
 		jsonData["sentences"] = sentDict
 
 		jsonData["documents"] = dict({})
 		docDict = dict()
-		for i in range(0,len(sentences)):
-			docDict[str(i+1)] = documents.split("\\")[1]
+		i = 0
+		docDict[str(i+1)] = documents.split("\\")[1]
 		jsonData["documents"] = docDict
 
 		jsonData = [jsonData]
 		data = json.dumps(jsonData)
 
 
-		print(jsonData)
+		#print(jsonData)
 		#print("data")
 		#print(data)
 		f.write(data)
 		f.write("\n")
   
+ 	# get filename where ans is located
 	def getfilename(self,index):
+		#print(self.filenames[index[0]])
 		return self.filenames[index[0]]
 
+	# dependency parse on sentences : root of sentence should equal root of question
+	# proper noun of question should be in the sentence
 	def dependency_parse(self,results,root,quesnoun,syn_list):
 		rootfiltered = []
 		#print (quesnoun)
 		for sent in results:
-			sentence = nlp(sent[0])
+			sentence = nlp(sent)
 			sentroots = []
 			nounlist = []
 			for token in sentence:
 				if token.dep_ == 'ROOT':
 					sentroots.append(token.lemma_.lower())
 			#if str(root[0]) in roots or str(root[0].lemma_) in roots:
-			for value in syn_list[str(root[0])]:
-				if value.lower() in sentroots or str(root[0].lemma_).lower() in sentroots:
-					#print("yes ",sentroots," yes ",sent[0])
+			#print(str(root[0]))
+			if str(root[0]) in syn_list:
+				for value in syn_list[str(root[0])]:
+					if value.lower() in sentroots or str(root[0].lemma_).lower() in sentroots:
+						#print("yes ",sentroots," yes ",sent[0])
+						rootfiltered.append(sent)
+						break
+			else:
+				if str(root[0].lemma_).lower() in sentroots:
+						#print("yes ",sentroots," yes ",sent[0])
 					rootfiltered.append(sent)
 					break
+
 		nounfiltered = []
 		for sent in rootfiltered:
-			sentence = nlp(sent[0])
+			sentence = nlp(sent)
 			nounlist = []
 			for token in sentence:
-				
 				if token.dep_ in ('nsubj','dobj','compound','nsubjpass'):
 					nounlist.append(token.text.lower())
 					#print(nounlist)
@@ -327,82 +351,125 @@ class QuestionAnswerModule:
 		#print(nounfiltered[0:2])
 		return nounfiltered
 			
+	# get exact answer from the answer sentence 
+	def extract_ans(self,question,answer):
+		doc = nlp(answer)
+		ans = []
+		if any(word in question.lower() for word in ['who','whom']):
+			for ent in doc.ents:
+				if (ent.label_ == "PERSON") or (ent.label_== "ORG"): 
+					if ent.text not in question:
+						ans.append(ent.text)
+		elif 'where' in question.lower():
+			for ent in doc.ents:
+				if (ent.label_ == "LOC") or (ent.label_ == "GPE"):      #Change here based on desired entity
+					if ent.text not in question:
+						ans.append(ent.text)
+		else:
+			for ent in doc.ents:
+				if (ent.label_ == "DATE") or (ent.label_== "TIME"):       #Change here based on desired entity
+					if ent.text not in question:
+						ans.append(ent.text)
+		return ans
 
-	
 
 def main():
-	#quesfile = input("Enter your filename : ")
-	#with open(quesfile,'r',encoding='latin-1') as fp:
-	#question = fp.readline().rstrip()
-#	while question:
-	#print(question)
-	question = input("Enter question: ")
-	#translator = str.maketrans('', '', string.punctuation)
-	#question = question.translate(translator)
-	question.replace("?", "")
-	ques_types = ['who','whom','when','where']							#types of questions we are handling
-	ob = QuestionAnswerModule() 
-	doc = nlp(question)
-	ques = ""
-	for token in doc:
-		if token.text.lower() not in stopwords.words('english') and token.text.lower() not in ques_types:
-			#if token.pos_ in ("NOUN","PROPN"):
-			ques+=token.text+" "
-	#print(ques)
-	corpora = ob.readfiles()
-	corpora.append(ques)
-	vector = ob.tf_idf(corpora)						
-	cos_array = ob.cosine_sim(vector)
-	top_indices = ob.get_top_k(cos_array, 2)							# get indices of top 4 documents
-	
-	#print(top_indices)
-	root, ques_search_list = ob.dep_parse_ques(question,ques_types)		#parse question into word, dependency parse tag
-	#print (ques_search_list)
-	syn_list = ob.extract_syn(ques_search_list)									# get synonyms of the root verb
-	#print(syn_list)
-	
-	#sentences_set = ob.extract_sentences_root(ques,syn_list,top_indices)		# get filtered sentences on the basis of root and its synonyms in question
-	#print (sentences_set)
-	#new_ques = sentences_set
-	s = ""
-	for word in question.split(" "):
-		if word.lower() not in ques_types and word.lower() not in stopwords.words('english'):
-			s += word + " "
-	for key,value in syn_list.items():
-		for val in value:
-			s+=val + " "
-	#print(s)
-	overlap_sent = ob.overlap(top_indices, s)
-	sorted_overlapped = ob.Sort_Tuple(overlap_sent)[0:20]
-	filtered_res = ob.check_ques_type(question,sorted_overlapped)
-	#filename = ob.getfilename(top_indices)
-	#ob.generateJson(question,filtered_res[0:2],filename)
-	#question = fp.readline()
-	root = nlp(root)
-	#filtered_res = []
-	quesnoun = []
-	for t in ques_search_list:
-		if t[2] == 'PROPN':
-			quesnoun.append(t[0])
-	#print (quesnoun)
-	print (filtered_res[0:5])
-	final_res = ob.dependency_parse(filtered_res,root,quesnoun,syn_list)
-	print (final_res)
+	fout = open("jsondata.txt","w+")
+	quesfile = input("Enter your filename : ")
+	with open(quesfile,'r',encoding='utf-8-sig') as fp:
+		question = fp.readline().rstrip()
+		while question:
+			#print(question)
+			#question = input("Enter question: ")
+			question.replace("?", "")
+			ques_types = ['who','whom','when','where']							#types of questions we are handling
+			ob = QuestionAnswerModule() 
+			doc = nlp(question)
+			ques = ""
+			for token in doc:
+				if token.text.lower() not in stopwords.words('english') and token.text.lower() not in ques_types:
+					ques+=token.text+" "
+			#print(ques)
 
+			# ********read files and get most relevant document*******
+			corpora = ob.readfiles()
+			corpora.append(ques)
+			vector = ob.tf_idf(corpora)						
+			cos_array = ob.cosine_sim(vector)
+			top_indices = ob.get_top_k(cos_array, 2)							# get indices of top 2 documents
+			
+			# ******** parse the question and get synonyms of non Proper Noun words ********
+			root, ques_search_list = ob.dep_parse_ques(question,ques_types)		#parse question into word, dependency parse tag
+			#print (ques_search_list)
+			syn_list = ob.extract_syn(ques_search_list)									# get synonyms of the root verb
+			#print(syn_list)
+			
+			
+			# ********* find top 20 overlapped sentences with question ***********
+			s = ""
+			for word in question.split(" "):
+				if word.lower() not in ques_types and word.lower() not in stopwords.words('english'):
+					s += word + " "
+			for key,value in syn_list.items():
+				for val in value:
+					s+=val + " "
+			#print(s)
+			overlap_sent,filename = ob.overlap(top_indices, s)
+			sorted_overlapped = ob.Sort_Tuple(overlap_sent)[0:20]
 
-	'''new_ques.append(s.lower())
-	#print (new_ques)
-	vector = ob.tf_idf(new_ques)
-	cos_array = ob.cosine_sim(vector)
-	top_indices = ob.get_top_k(cos_array, 8)
-	f = cos_array.flatten()
-	for index in top_indices:
-	 	print ("index:",index," ","cosine:",f[index]," ",new_ques[index])
-	#print (ques_search_list)
-	#print(syn_list['killed'])
-	#print(sentences_set)
-	#for word in search_list:
-	#	print (word)'''
+			# ********* do named entity on the overlapped sentences ************
+			filtered_res = ob.check_ques_type(question,sorted_overlapped)
+			#print (filtered_res[0:5])
+
+			# ******** tf idf of sentences and question **********************
+			new_ques = []
+			for sentence in filtered_res:
+				new_ques.append(sentence[0])
+			s = ""
+			for word in question.split(" "):
+				if word.lower() not in ques_types and word.lower() not in stopwords.words('english'):
+					s += word + " "
+			for key,value in syn_list.items():
+				k = nlp(key)
+				if k[0].pos_ == "VERB":
+					for val in value:
+						s+=val + " "
+			new_ques.append(s.lower())
+			vector = ob.tf_idf(new_ques)
+			cos_array = ob.cosine_sim(vector)
+			top_indices = ob.get_top_k(cos_array, 5)				# get only top 5 sentences
+			f = cos_array.flatten()
+			tf_idf_result = []
+			for index in top_indices:
+			 	#print ("index:",index," ","cosine:",f[index]," ",new_ques[index])
+			 	tf_idf_result.append(new_ques[index])
+
+			# ********* do dependency parse on the sentences ********
+			root = nlp(root)
+			quesnoun = []
+			for t in ques_search_list:
+				if t[2] == 'PROPN':
+					quesnoun.append(t[0])
+			#print (quesnoun)
+			final_res = ob.dependency_parse(tf_idf_result,root,quesnoun,syn_list)
+			#print (final_res)
+
+			# check if dependency parse returned 0 then ans is first sentence of named entity set of sentences *****
+			if len(final_res) == 0:
+				ans_sent = filtered_res[0][0]
+			else:
+				ans_sent = final_res[0]
+
+			anslist = ob.extract_ans(question, ans_sent)
+			anslist = set(anslist)
+			answer = ",".join(anslist)
+			print("final ans ", answer)
+
+			# ******* save in file ******
+			#filename = ob.getfilename(top_indices)
+			ob.generateJson(fout,question,answer,ans_sent,filename)
+			question = fp.readline()
+	fout.close()
 
 
 if __name__ == "__main__":
