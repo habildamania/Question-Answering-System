@@ -45,7 +45,6 @@ python <program name>.py
 ## Authors
 
 * **Habil Damania**
-* **Kanika Rawat**
 
 ## Acknowledgement
 
